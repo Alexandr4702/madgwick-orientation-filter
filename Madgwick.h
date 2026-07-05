@@ -1,128 +1,67 @@
-/*
- * Madgwick.h
- *
- *  Created on: Mar 26, 2021
- *      Author: alexandr
- */
-
 #ifndef MADGWICK_H_
 #define MADGWICK_H_
 
-#include "Eigen/Eigen"
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
-using Vec3 = Eigen::Vector3d;
-using Quat = Eigen::Quaternion<double>;
+namespace madgwick {
 
-/*
- *@brief: functions to work with quaternions
- *
-*/
-//----------------------------------------------------------------------------------------------------------------
-Quat operator* (Quat& q1, double Scalar );
-Quat operator* (Quat&& q1, double Scalar );
+using Vector3 = Eigen::Vector3d;
+using Quaternion = Eigen::Quaterniond;
 
-Quat operator* (double Scalar, Quat& q1 );
-Quat operator* (double Scalar, Quat&& q1 );
-//----------------------------------------------------------------------------------------------------------------
-Quat operator/ (Quat& q1, double Scalar );
-Quat operator/ (Quat&& q1, double Scalar );
-Quat operator/ (double Scalar, Quat& q1 );
-Quat operator/ (double Scalar, Quat&& q1 );
-//----------------------------------------------------------------------------------------------------------------
-Quat operator+ (Quat& q1, double Scalar );
-Quat operator+ (Quat&& q1, double Scalar );
-Quat operator+ (double Scalar, Quat& q1 );
-Quat operator+ (double Scalar, Quat&& q1 );
-
-Quat operator+ (Quat& q1, Quat& q2 );
-Quat operator+ (Quat&& q1, Quat& q2 );
-Quat operator+ (Quat& q1, Quat&& q2 );
-Quat operator+ (Quat&& q1, Quat&& q2 );
-//----------------------------------------------------------------------------------------------------------------
-Quat operator- (Quat& q1, double Scalar );
-Quat operator- (Quat&& q1, double Scalar );
-Quat operator- (double Scalar, Quat& q1 );
-Quat operator- (double Scalar, Quat&& q1 );
-
-Quat operator- (Quat& q1, Quat& q2 );
-Quat operator- (Quat&& q1, Quat& q2 );
-Quat operator- (Quat& q1, Quat&& q2 );
-Quat operator- (Quat&& q1, Quat&& q2 );
-//----------------------------------------------------------------------------------------------------------------
-
-
-class Madgwick_filter
-{
-public:
-    /*!
-     * \brief update all vectors have to be normalized otherwise it won't work correct
-     * \param sun_ref
-     * \param magn_ref
-     * \param sun_meas
-     * \param magn_meas
-     * \param omega
-     */
-    void update(Vec3 sun_ref, Vec3 magn_ref, Vec3 sun_meas, Vec3 magn_meas, Vec3 omega, double dt);
-    void update(Vec3 sun_ref, Vec3 sun_meas, Vec3 omega, double dt);
-
-
-    Quat get_orientation();
-
-    Vec3 getOmega_bias() const;
-    void setOmega_bias(const Vec3 &value);
-    /*!
-     * \brief get_omega_from_quat
-     * \param q
-     * \param q_1
-     * \param dt
-     * \return
-     */
-    static Vec3 get_omega_from_quat(Quat q, Quat q_1, double dt);
-
-private:
-    /*!
-     * \brief omega_integration
-     * \param q_1
-     * \param omega
-     * \param dt
-     * \return
-     */
-    Quat omega_integration (Quat q_1,Vec3 omega, double dt);
-
-    /*!
-     * \brief func
-     * \param q quat
-     * \param d ref
-     * \param s sensors measurment
-     * \return q^{-1} * d * q - s
-     */
-    Quat func(Quat q, Vec3 d, Vec3 s);
-
-    Eigen::Matrix<double, 3, 4> Jacobian(Quat q, Vec3 d);
-
-    /*!
-     * \brief grad_function q^{-1} * d * q - s
-     * \param q quat
-     * \param d reference vector
-     * \param s sensor measurments
-     * \return J^T * f
-     */
-    Quat grad_function(Vec3 ref, Vec3 meas, Quat q);
-
-    /*!
-     * \brief returns q dervative from current quaternion and current omega
-     * \param q_1
-     * \param omega
-     * \return
-     */
-    Quat q_dervative_omega (Quat q_1, Vec3 omega);
-
-private:
-	double betta = 0.1;
-	Quat q_1 = Quat(1,0,0,0); //we should begin from quat from triad
-	Vec3 omega_bias = Vec3(0,0,0);
+struct DirectionObservation {
+  Vector3 reference;
+  Vector3 measurement;
 };
 
+struct FilterTestAccess;
 
+class Filter {
+public:
+  explicit Filter(
+      double correction_gain = 0.1, double bias_gain = 0.001,
+      const Quaternion &initial_orientation = Quaternion::Identity());
 
-#endif /* MADGWICK_H_ */
+  void update(const DirectionObservation &observation,
+              const Vector3 &angular_velocity, double dt);
+
+  void update(const DirectionObservation &observation1,
+              const DirectionObservation &observation2,
+              const Vector3 &angular_velocity, double dt);
+
+  [[nodiscard]] Quaternion orientation() const noexcept;
+  void set_orientation(const Quaternion &orientation);
+
+  [[nodiscard]] Vector3 gyro_bias() const noexcept;
+  void set_gyro_bias(const Vector3 &bias);
+
+  [[nodiscard]] double correction_gain() const noexcept;
+  [[nodiscard]] double bias_gain() const noexcept;
+  void set_gains(double correction_gain, double bias_gain);
+
+  void reset(const Quaternion &orientation = Quaternion::Identity(),
+             const Vector3 &gyro_bias = Vector3::Zero());
+
+  [[nodiscard]] static Vector3 angular_velocity(const Quaternion &current,
+                                                const Quaternion &previous,
+                                                double dt);
+
+private:
+  friend struct FilterTestAccess;
+
+  [[nodiscard]] static Quaternion
+  observation_gradient(const DirectionObservation &observation,
+                       const Quaternion &orientation);
+
+  void apply_gradient(const Quaternion &gradient,
+                      const Vector3 &angular_velocity, double dt);
+
+  double correction_gain_;
+  double bias_gain_;
+  Quaternion orientation_ = Quaternion::Identity();
+  Vector3 gyro_bias_ = Vector3::Zero();
+};
+
+} // namespace madgwick
+
+#endif
