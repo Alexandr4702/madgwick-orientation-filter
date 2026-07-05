@@ -66,7 +66,7 @@ public:
     void update(Vec3 sun_ref, Vec3 sun_meas, Vec3 omega, double dt);
 
 
-    Quat get_orientaion();
+    Quat get_orientation();
 
     Vec3 getOmega_bias() const;
     void setOmega_bias(const Vec3 &value);

@@ -41,8 +41,7 @@ $$
 Q = q^{-1}.
 $$
 
-`get_orientaion()` returns `Q`. The spelling is retained for compatibility
-with the existing API.
+`get_orientation()` returns `Q`.
 
 Here, $q_{BW}$ rotates a world-frame vector into the body frame, while the
 returned $Q=q_{WB}$ rotates a body-frame vector into the world frame. For a
@@ -250,7 +249,7 @@ filter.update(
     gyro_rad_s,
     dt_seconds);
 
-Quat orientation = filter.get_orientaion();
+Quat orientation = filter.get_orientation();
 Vec3 estimated_bias = filter.getOmega_bias();
 ```
 
@@ -376,7 +375,6 @@ simulation from merely duplicating the implementation under test.
 - The implementation does not currently reject zero vectors, non-finite
   values, or non-positive time steps.
 - The correction gain and bias gain are fixed in the class implementation.
-- The public method name `get_orientaion()` contains a historical typo.
 - Euler integration is accurate only when the sampling interval is small
   relative to angular velocity.
 - Accelerometer measurements are reliable gravity observations only when

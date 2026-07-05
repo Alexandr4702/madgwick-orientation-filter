@@ -38,7 +38,7 @@ std::array<double, 7> runReferenceScenario()
         orientation = (orientation * omega_step).normalized();
     }
 
-    const Quat q = filter.get_orientaion();
+    const Quat q = filter.get_orientation();
     const Vec3 bias = filter.getOmega_bias();
     return {q.w(), q.x(), q.y(), q.z(), bias.x(), bias.y(), bias.z()};
 }
@@ -51,7 +51,7 @@ TEST(Characterization, IdentityIsPreservedWithZeroAngularVelocity)
         filter.update(Vec3::UnitX(), Vec3::UnitY(), Vec3::UnitX(),
                       Vec3::UnitY(), Vec3::Zero(), 0.01);
 
-    const Quat q = filter.get_orientaion();
+    const Quat q = filter.get_orientation();
     EXPECT_DOUBLE_EQ(q.w(), 1.0);
     EXPECT_DOUBLE_EQ(q.x(), 0.0);
     EXPECT_DOUBLE_EQ(q.y(), 0.0);
@@ -67,7 +67,7 @@ TEST(Characterization, OneGyroStepMatchesExistingEulerIntegration)
     // it, and returns its inverse. These equations intentionally mirror that
     // behavior rather than prescribing a new integration method.
     const double norm = std::sqrt(1.0 + 0.05*0.05 + 0.10*0.10 + 0.15*0.15);
-    const Quat q = filter.get_orientaion();
+    const Quat q = filter.get_orientation();
     EXPECT_DOUBLE_EQ(q.w(), 1.0 / norm);
     EXPECT_DOUBLE_EQ(q.x(), -0.05 / norm);
     EXPECT_DOUBLE_EQ(q.y(), -0.10 / norm);
@@ -92,7 +92,7 @@ TEST(Simulation, TracksConstantRotationWithIdealSensors)
     constexpr double dt = 0.002;
 
     for (int i = 0; i < 5000; ++i) {
-        // get_orientaion() returns the inverse of the internally integrated
+        // get_orientation() returns the inverse of the internally integrated
         // quaternion, hence its positive gyro convention is -omega.
         truth = integrateTruth(truth, -omega, dt);
         const Vec3 meas1 = truth.conjugate() * ref1;
@@ -100,7 +100,7 @@ TEST(Simulation, TracksConstantRotationWithIdealSensors)
         filter.update(ref1, ref2, meas1, meas2, omega, dt);
     }
 
-    EXPECT_LT(angularError(filter.get_orientaion(), truth), 5e-4);
+    EXPECT_LT(angularError(filter.get_orientation(), truth), 5e-4);
 }
 
 TEST(Simulation, CorrectsAnInitialAttitudeError)
@@ -116,7 +116,7 @@ TEST(Simulation, CorrectsAnInitialAttitudeError)
         filter.update(ref1, ref2, meas1, meas2, Vec3::Zero(), 0.002);
 
     // The legacy, unnormalized gradient settles to a small residual error.
-    EXPECT_LT(angularError(filter.get_orientaion(), truth), 5e-3);
+    EXPECT_LT(angularError(filter.get_orientation(), truth), 5e-3);
 }
 
 TEST(Simulation, EstimatesConstantGyroscopeBiasWhileStationary)
@@ -129,7 +129,7 @@ TEST(Simulation, EstimatesConstantGyroscopeBiasWhileStationary)
     for (int i = 0; i < 30000; ++i)
         filter.update(ref1, ref2, ref1, ref2, gyro_bias, 0.002);
 
-    EXPECT_LT(angularError(filter.get_orientaion(), Quat::Identity()), 1e-2);
+    EXPECT_LT(angularError(filter.get_orientation(), Quat::Identity()), 1e-2);
     EXPECT_LT((filter.getOmega_bias() - gyro_bias).norm(), gyro_bias.norm());
 }
 

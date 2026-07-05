@@ -142,7 +142,7 @@ void Madgwick_filter::update(Vec3 sun_ref, Vec3 sun_meas, Vec3 omega, double dt)
     q_1.normalize();
 }
 
-Quat Madgwick_filter::get_orientaion()
+Quat Madgwick_filter::get_orientation()
 {
     return q_1.inverse();
 }
