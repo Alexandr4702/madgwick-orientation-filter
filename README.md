@@ -391,3 +391,7 @@ simulations with motion, noise, timing jitter, and gyroscope bias.
   linear acceleration is sufficiently small.
 - Magnetometer measurements require calibration and can be disturbed by nearby
   magnetic materials and currents.
+
+## License
+
+This project is available under the [MIT License](LICENSE).

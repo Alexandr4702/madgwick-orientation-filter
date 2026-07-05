@@ -211,7 +211,7 @@ TEST(Simulation, CorrectsAnInitialAttitudeError) {
 }
 
 TEST(Simulation, EstimatesConstantGyroscopeBiasWhileStationary) {
-  Filter filter;
+  Filter filter(0.1, 0.01);
   const Vector3 gyro_bias(0.004, -0.003, 0.002);
   const Vector3 ref1 = Vector3::UnitZ();
   const Vector3 ref2 = Vector3::UnitX();
@@ -220,8 +220,39 @@ TEST(Simulation, EstimatesConstantGyroscopeBiasWhileStationary) {
     filter.update(observation(ref1, ref1), observation(ref2, ref2), gyro_bias,
                   0.002);
 
-  EXPECT_LT(angularError(filter.orientation(), Quaternion::Identity()), 1e-2);
-  EXPECT_LT((filter.gyro_bias() - gyro_bias).norm(), gyro_bias.norm());
+  EXPECT_LT(angularError(filter.orientation(), Quaternion::Identity()), 1e-3);
+  EXPECT_NEAR(filter.gyro_bias().x(), gyro_bias.x(), 5e-4);
+  EXPECT_NEAR(filter.gyro_bias().y(), gyro_bias.y(), 5e-4);
+  EXPECT_NEAR(filter.gyro_bias().z(), gyro_bias.z(), 5e-4);
+}
+
+TEST(Simulation, GyroscopeBiasConvergesFromAnIncorrectInitialEstimate) {
+  Filter filter(0.1, 0.01);
+  const Vector3 actual_bias(-0.005, 0.003, 0.004);
+  filter.set_gyro_bias(Vector3(0.003, -0.002, 0.001));
+  const Vector3 ref1 = Vector3(0.2, -0.3, 0.93).normalized();
+  const Vector3 ref2 = Vector3(-0.7, 0.6, 0.2).normalized();
+
+  for (int i = 0; i < 40000; ++i)
+    filter.update(observation(ref1, ref1), observation(ref2, ref2), actual_bias,
+                  0.002);
+
+  EXPECT_LT((filter.gyro_bias() - actual_bias).norm(), 5e-4);
+  EXPECT_LT(angularError(filter.orientation(), Quaternion::Identity()), 1e-3);
+}
+
+TEST(Simulation, ZeroBiasGainLeavesTheBiasEstimateUnchanged) {
+  const Vector3 initial_bias(0.003, -0.002, 0.001);
+  Filter filter(0.1, 0.0);
+  filter.set_gyro_bias(initial_bias);
+  const Vector3 ref1 = Vector3::UnitZ();
+  const Vector3 ref2 = Vector3::UnitX();
+
+  for (int i = 0; i < 1000; ++i)
+    filter.update(observation(ref1, ref1), observation(ref2, ref2),
+                  Vector3(0.01, -0.02, 0.005), 0.002);
+
+  EXPECT_EQ(filter.gyro_bias(), initial_bias);
 }
 
 TEST(Simulation, TracksTimeVaryingThreeAxisMotionWithSamplePeriodJitter) {
