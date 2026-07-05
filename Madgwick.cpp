@@ -215,7 +215,7 @@ Quat Madgwick_filter::func(Quat q, Vec3 d, Vec3 s)
 
      Quat ref_q(0,ref.x (),ref.y (),ref.z ());
      Quat frame_q(0,frame.x (),frame.y (),frame.z ());
-     return q.conjugate () * frame_q * q - ref_q;
+     return q.conjugate () * ref_q * q - frame_q;
  }
 
 Eigen::Matrix<double, 3, 4> Madgwick_filter::Jacobian(Quat q, Vec3 d)
@@ -229,7 +229,7 @@ Eigen::Matrix<double, 3, 4> Madgwick_filter::Jacobian(Quat q, Vec3 d)
 
     Eigen::Matrix<double, 3, 4> ret;
     ret << ( d.y() * q4 - d.z() * q3), (d.y() * q3 + d.z() * q4)                 , ( - 2.0 * d.x() * q3 + d.y() * q2 - d.z() * q1), (-2 * d.x() * q4 + d.y() * q1 + d.z() * q2),
-           (-d.x() * q4 + d.z() * q2), (d.x() * q3 - 2 * d.y() * q2 + d.z() * q1), d.x() * q2 + d.z() * q4                        , (d.x() * q1 - 2  * d.y() * q4 + d.z() * q3),
+           (-d.x() * q4 + d.z() * q2), (d.x() * q3 - 2 * d.y() * q2 + d.z() * q1), d.x() * q2 + d.z() * q4                        , (-d.x() * q1 - 2  * d.y() * q4 + d.z() * q3),
              d.x() * q3 - d.y() * q2 ,  d.x() * q4 - d.y() * q1 - 2 * d.z() * q2 , d.x() * q1 + d.y() * q4 - 2 * d.z() * q3       ,  d.x() * q2 + d.y() * q3;
     ret = ret * 2;
     return ret;

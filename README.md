@@ -122,7 +122,7 @@ $$
 J(q,d)=2
 \begin{bmatrix}
 d_yz-d_zy & d_yy+d_zz & -2d_xy+d_yx-d_zw & -2d_xz+d_yw+d_zx \\
--d_xz+d_zx & d_xy-2d_yx+d_zw & d_xx+d_zz & d_xw-2d_yz+d_zy \\
+-d_xz+d_zx & d_xy-2d_yx+d_zw & d_xx+d_zz & -d_xw-2d_yz+d_zy \\
 d_xy-d_yx & d_xz-d_yw-2d_zx & d_xw+d_yz-2d_zy & d_xx+d_yy
 \end{bmatrix}.
 $$
@@ -138,7 +138,7 @@ J_{14}&=2(-2d_xz+d_yw+d_zx), \\
 J_{21}&=2(-d_xz+d_zx), &
 J_{22}&=2(d_xy-2d_yx+d_zw), \\
 J_{23}&=2(d_xx+d_zz), &
-J_{24}&=2(d_xw-2d_yz+d_zy), \\
+J_{24}&=2(-d_xw-2d_yz+d_zy), \\
 J_{31}&=2(d_xy-d_yx), &
 J_{32}&=2(d_xz-d_yw-2d_zx), \\
 J_{33}&=2(d_xw+d_yz-2d_zy), &
