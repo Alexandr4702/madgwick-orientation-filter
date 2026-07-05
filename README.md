@@ -40,7 +40,7 @@ $$
 Q = q^{-1}.
 $$
 
-`get_orientation()` returns `Q`.
+`orientation()` returns `Q`.
 
 Here, $q_{BW}$ rotates a world-frame vector into the body frame, while the
 returned $Q=q_{WB}$ rotates a body-frame vector into the world frame. For a
@@ -57,8 +57,9 @@ $$
 d_q = [0, d_x, d_y, d_z]^T.
 $$
 
-Reference and measured vectors must be normalized before calling `update()`.
-Angular velocity must be expressed in radians per second, and `dt` in seconds.
+Reference and measured vectors are normalized by `update()`. Zero and non-finite
+vectors are rejected. Angular velocity must be in radians per second and `dt`
+must be finite and positive.
 
 ## Filter model
 
@@ -80,7 +81,7 @@ $$
 the gyroscope contribution to the quaternion derivative is
 
 $$
-\dot q_\omega = \frac{1}{2}q \otimes \Omega,
+\dot q_\omega = -\frac{1}{2}\Omega \otimes q,
 $$
 
 where $\otimes$ denotes quaternion multiplication.
@@ -107,54 +108,8 @@ $$
 J(q,d)=\frac{\partial f(q,d,s)}{\partial q}.
 $$
 
-For
-
-$$
-q=[w,x,y,z]^T, \qquad d=[d_x,d_y,d_z]^T,
-$$
-
-and quaternion columns ordered as $[w,x,y,z]$, the `Jacobian()` helper in the
-current source evaluates
-
-$$
-J(q,d)=2
-\begin{bmatrix}
-d_yz-d_zy & d_yy+d_zz & -2d_xy+d_yx-d_zw & -2d_xz+d_yw+d_zx \\
--d_xz+d_zx & d_xy-2d_yx+d_zw & d_xx+d_zz & -d_xw-2d_yz+d_zy \\
-d_xy-d_yx & d_xz-d_yw-2d_zx & d_xw+d_yz-2d_zy & d_xx+d_yy
-\end{bmatrix}.
-$$
-
-Written element by element, this is
-
-$$
-\begin{aligned}
-J_{11}&=2(d_yz-d_zy), &
-J_{12}&=2(d_yy+d_zz), \\
-J_{13}&=2(-2d_xy+d_yx-d_zw), &
-J_{14}&=2(-2d_xz+d_yw+d_zx), \\
-J_{21}&=2(-d_xz+d_zx), &
-J_{22}&=2(d_xy-2d_yx+d_zw), \\
-J_{23}&=2(d_xx+d_zz), &
-J_{24}&=2(-d_xw-2d_yz+d_zy), \\
-J_{31}&=2(d_xy-d_yx), &
-J_{32}&=2(d_xz-d_yw-2d_zx), \\
-J_{33}&=2(d_xw+d_yz-2d_zy), &
-J_{34}&=2(d_xx+d_yy).
-\end{aligned}
-$$
-
-Products such as $d_yz$ mean ordinary scalar multiplication. The measured
-vector $s$ does not appear in $J$ because it is constant with respect to the
-quaternion; it enters through the residual $f$.
-
-The legacy `update()` path does not call `Jacobian()` directly. It calls
-`grad_function()`, which contains a symbolically expanded gradient. The matrix
-above documents the existing helper exactly; the simulation and
-characterization tests protect the behavior of the expanded update path.
-
-The source contains the expanded analytic form of this gradient, avoiding a
-numerical Jacobian at runtime.
+The implementation evaluates this analytic Jacobian directly. A randomized
+test compares all four gradient components against central finite differences.
 
 For two observations, the gradients are added:
 
@@ -169,17 +124,18 @@ reference vectors.
 
 ### Corrected state equation
 
-The original Madgwick filter normalizes the correction gradient:
+Expressed in this quaternion convention, the original Madgwick
+normalized-gradient form is:
 
 $$
-\dot q = \frac{1}{2}q\otimes\Omega
+\dot q = -\frac{1}{2}\Omega\otimes q
 - \beta\frac{g}{\lVert g\rVert}.
 $$
 
 This generalized implementation uses the raw gradient instead:
 
 $$
-\dot q = \frac{1}{2}q\otimes\Omega - \beta g,
+\dot q = -\frac{1}{2}\Omega\otimes q - \beta g,
 $$
 
 so the correction strength depends on the measurement error and reference
@@ -208,7 +164,7 @@ The angular correction associated with the gradient is calculated as
 
 $$
 \omega_\varepsilon =
-\operatorname{vec}\left(2q^{-1}\otimes g\right).
+-\operatorname{vec}\left(2g\otimes q^{-1}\right).
 $$
 
 The bias estimate is then updated using
@@ -242,25 +198,18 @@ This is the preferred mode when full attitude estimation is required.
 ```cpp
 #include "Madgwick.h"
 
-Madgwick_filter filter;
+madgwick::Filter filter;
 
-Vec3 gravity_world(0.0, 0.0, 1.0);
-Vec3 magnetic_world(1.0, 0.0, 0.0);
-
-Vec3 gravity_body = accelerometer.normalized();
-Vec3 magnetic_body = magnetometer.normalized();
-Vec3 gyro_rad_s = gyroscope;
+madgwick::Vector3 gyro_rad_s = gyroscope;
 
 filter.update(
-    gravity_world,
-    magnetic_world,
-    gravity_body,
-    magnetic_body,
+    {madgwick::Vector3(0.0, 0.0, 1.0), accelerometer},
+    {madgwick::Vector3(1.0, 0.0, 0.0), magnetometer},
     gyro_rad_s,
     dt_seconds);
 
-Quat orientation = filter.get_orientation();
-Vec3 estimated_bias = filter.getOmega_bias();
+madgwick::Quaternion orientation = filter.orientation();
+madgwick::Vector3 estimated_bias = filter.gyro_bias();
 ```
 
 ### One-vector update
@@ -269,8 +218,7 @@ Use this mode when only one absolute direction is available:
 
 ```cpp
 filter.update(
-    gravity_world,
-    accelerometer.normalized(),
+    {gravity_world, accelerometer},
     gyroscope_rad_s,
     dt_seconds);
 ```
@@ -283,13 +231,13 @@ the gyroscope and will therefore drift over time.
 If a calibration value is available, it can be supplied before filtering:
 
 ```cpp
-filter.setOmega_bias(calibrated_bias_rad_s);
+filter.set_gyro_bias(calibrated_bias_rad_s);
 ```
 
 ### Angular velocity from quaternion samples
 
 ```cpp
-Vec3 omega = Madgwick_filter::get_omega_from_quat(
+madgwick::Vector3 omega = madgwick::Filter::angular_velocity(
     current_orientation,
     previous_orientation,
     dt_seconds);
@@ -358,10 +306,6 @@ simulations with motion, noise, timing jitter, and gyroscope bias.
 
 ## Current limitations
 
-- Input vectors are expected to be normalized by the caller.
-- The implementation does not currently reject zero vectors, non-finite
-  values, or non-positive time steps.
-- The correction gain and bias gain are fixed in the class implementation.
 - Euler integration is accurate only when the sampling interval is small
   relative to angular velocity.
 - Accelerometer measurements are reliable gravity observations only when
