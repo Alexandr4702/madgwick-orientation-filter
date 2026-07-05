@@ -1,0 +1,32 @@
+# CMake build trees and generated files
+/build/
+/out/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+Testing/
+
+# Compiler and linker output
+*.obj
+*.o
+*.lib
+*.a
+*.dll
+*.so
+*.dylib
+*.exe
+*.pdb
+
+# IDEs and language servers
+/.cache/
+/.vs/
+/.vscode/
+/.idea/
+*.sln
+*.vcxproj*
+*.user
+
+# Operating-system files
+.DS_Store
+Thumbs.db
