@@ -80,41 +80,120 @@ $$
 
 the gyroscope contribution to the quaternion derivative is
 
-$$
+```math
 \dot q_\omega = -\frac{1}{2}\Omega \otimes q,
-$$
+```
 
 where $\otimes$ denotes quaternion multiplication.
 
 ### Vector observation error
 
-For a known reference vector $d$ and measured vector $s$, the observation
-residual can be written as
+Let $d$ be a known direction in the world frame and $s$ the same direction
+measured in the body frame. The quaternion product rotates $d$ into the body
+frame, and the residual compares that prediction with the measurement:
 
 $$
-f(q,d,s) = \operatorname{vec}\left(q\otimes d_q\otimes q^{-1}\right)-s.
+f(q,d,s)=
+\mathrm{vec}\left(q\otimes d_q\otimes q^{-1}\right)-s.
 $$
 
-The correction direction is obtained from the gradient of the squared
-observation error:
+For the unit quaternion $q=[w,x,y,z]^T$, reference
+$d=[d_x,d_y,d_z]^T$, and measurement $s=[s_x,s_y,s_z]^T$, the residual
+components are
 
 $$
-g(q) = J(q,d)^T f(q,d,s),
+\begin{aligned}
+f_x={}&(w^2+x^2-y^2-z^2)d_x
+      +2(xy-wz)d_y+2(xz+wy)d_z-s_x, \\
+f_y={}&2(xy+wz)d_x
+      +(w^2-x^2+y^2-z^2)d_y+2(yz-wx)d_z-s_y, \\
+f_z={}&2(xz-wy)d_x+2(yz+wx)d_y
+      +(w^2-x^2-y^2+z^2)d_z-s_z.
+\end{aligned}
 $$
 
-with
+Here $f\in\mathbb{R}^3$ is a vector, so it is not minimized directly. The
+filter minimizes the scalar squared-error cost
 
 $$
-J(q,d)=\frac{\partial f(q,d,s)}{\partial q}.
+E(q,d,s)=\frac{1}{2}\lVert f(q,d,s)\rVert^2.
 $$
+
+An orientation that aligns the reference with the measurement gives
+$f=0$ and therefore $E=0$. Away from that solution, gradient descent changes
+$q$ in the direction that decreases $E$ most rapidly.
+
+The Jacobian
+
+$$
+J(q,d)=\frac{\partial f(q,d,s)}{\partial q}
+\in\mathbb{R}^{3\times4}
+$$
+
+is arranged with one row per residual component and one column per quaternion
+component:
+
+$$
+J=
+\begin{bmatrix}
+\dfrac{\partial f_x}{\partial w} &
+\dfrac{\partial f_x}{\partial x} &
+\dfrac{\partial f_x}{\partial y} &
+\dfrac{\partial f_x}{\partial z} \\
+\dfrac{\partial f_y}{\partial w} &
+\dfrac{\partial f_y}{\partial x} &
+\dfrac{\partial f_y}{\partial y} &
+\dfrac{\partial f_y}{\partial z} \\
+\dfrac{\partial f_z}{\partial w} &
+\dfrac{\partial f_z}{\partial x} &
+\dfrac{\partial f_z}{\partial y} &
+\dfrac{\partial f_z}{\partial z}
+\end{bmatrix}.
+$$
+
+Differentiating the component equations gives
+
+$$
+J(q,d)=2
+\begin{bmatrix}
+wd_x-zd_y+yd_z & xd_x+yd_y+zd_z & -yd_x+xd_y+wd_z & -zd_x-wd_y+xd_z \\
+zd_x+wd_y-xd_z & yd_x-xd_y-wd_z & xd_x+yd_y+zd_z & wd_x-zd_y+yd_z \\
+-yd_x+xd_y+wd_z & zd_x+wd_y-xd_z & -wd_x+zd_y-yd_z & xd_x+yd_y+zd_z
+\end{bmatrix}.
+$$
+
+The measurement $s$ does not appear in $J$ because it is constant with
+respect to $q$.
+
+This matrix describes how the three residual components change when the four
+quaternion components change. Applying the chain rule gives the cost gradient
+
+$$
+g(q)=\nabla_q E(q,d,s)=J(q,d)^T f(q,d,s).
+$$
+
+Thus $g(q)$ points uphill, toward increasing observation error, and $-g(q)$
+is the correction direction used by the filter. A standalone gradient-descent
+step would be
+
+$$
+q_{k+1}=\mathrm{normalize}\left(q_k-\mu g(q_k)\right),
+$$
+
+where $\mu>0$ is the step size. Quaternion normalization keeps the estimate on
+the unit sphere; $q$ and $-q$ represent the same physical orientation.
 
 The implementation evaluates this analytic Jacobian directly. A randomized
 test compares all four gradient components against central finite differences.
 
-For two observations, the gradients are added:
+For two observations, the total cost and its gradient are sums:
 
 $$
-g = g_1 + g_2.
+E_{\mathrm{total}}=E_1+E_2,
+$$
+
+$$
+g_{\mathrm{total}}=g_1+g_2.
 $$
 
 The current implementation intentionally preserves its original behavior and
@@ -127,16 +206,16 @@ reference vectors.
 Expressed in this quaternion convention, the original Madgwick
 normalized-gradient form is:
 
-$$
+```math
 \dot q = -\frac{1}{2}\Omega\otimes q
 - \beta\frac{g}{\lVert g\rVert}.
-$$
+```
 
 This generalized implementation uses the raw gradient instead:
 
-$$
+```math
 \dot q = -\frac{1}{2}\Omega\otimes q - \beta g,
-$$
+```
 
 so the correction strength depends on the measurement error and reference
 vector geometry. This gives a smooth, vanishing correction near the solution
@@ -152,7 +231,7 @@ $$
 The implementation uses a first-order Euler step followed by normalization:
 
 $$
-q_{k+1} = \operatorname{normalize}\left(q_k + \dot q_k\Delta t\right).
+q_{k+1} = \mathrm{normalize}\left(q_k + \dot q_k\Delta t\right).
 $$
 
 Normalization keeps the quaternion on the unit sphere despite integration and
@@ -164,7 +243,7 @@ The angular correction associated with the gradient is calculated as
 
 $$
 \omega_\varepsilon =
--\operatorname{vec}\left(2g\otimes q^{-1}\right).
+-\mathrm{vec}\left(2g\otimes q^{-1}\right).
 $$
 
 The bias estimate is then updated using
@@ -283,7 +362,7 @@ ctest --test-dir build -C Release --output-on-failure
 Clone with the Eigen submodule:
 
 ```sh
-git clone --recurse-submodules <repository-url>
+git clone --recurse-submodules https://github.com/Alexandr4702/madgwick-orientation-filter.git
 ```
 
 For an existing checkout:
