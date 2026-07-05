@@ -19,13 +19,12 @@ includes online gyroscope-bias estimation.
 
 ## Dependencies
 
-- C++17 compiler
+- C++20 compiler
 - CMake 3.16 or newer
-- Eigen 3
-- GoogleTest when tests are enabled
+- Eigen 3 Git submodule
+- System-installed GoogleTest when tests are enabled
 
-CMake downloads Eigen when it is not available locally. GoogleTest is fetched
-only when `MADGWICK_BUILD_TESTS` is enabled.
+Eigen is included as the `third_party/eigen` Git submodule.
 
 ## Coordinate convention
 
@@ -170,14 +169,25 @@ reference vectors.
 
 ### Corrected state equation
 
-The complete derivative is
+The original Madgwick filter normalizes the correction gradient:
+
+$$
+\dot q = \frac{1}{2}q\otimes\Omega
+- \beta\frac{g}{\lVert g\rVert}.
+$$
+
+This generalized implementation uses the raw gradient instead:
 
 $$
 \dot q = \frac{1}{2}q\otimes\Omega - \beta g,
 $$
 
-where $\beta$ controls the strength of the vector correction. The current
-default is
+so the correction strength depends on the measurement error and reference
+vector geometry. This gives a smooth, vanishing correction near the solution
+and avoids division by a near-zero norm, but makes convergence and tuning
+depend on the number, scaling, and geometry of observations. The normalized
+form has a correction magnitude fixed by $\beta$, but may amplify sensor noise
+near the solution. The current default is
 
 $$
 \beta = 0.1.
@@ -322,52 +332,29 @@ Run the test suite with:
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-To use only system-installed dependencies:
+Clone with the Eigen submodule:
 
 ```sh
-cmake -S . -B build \
-  -DMADGWICK_BUILD_TESTS=ON \
-  -DMADGWICK_FETCH_DEPENDENCIES=OFF
+git clone --recurse-submodules <repository-url>
+```
+
+For an existing checkout:
+
+```sh
+git submodule update --init --recursive
 ```
 
 Projects using CMake can include the library with:
 
 ```cmake
 add_subdirectory(path/to/madgwick-orientation-filter)
-target_link_libraries(your_target PRIVATE Madgwick::madgwick)
+target_link_libraries(your_target PRIVATE madgwick)
 ```
 
 ## Tests
 
-The GoogleTest suite contains both characterization tests and independent
-sensor simulations.
-
-### Characterization tests
-
-These tests lock down the current numerical behavior so that future refactors
-can be checked for unintended changes:
-
-- identity preservation with zero angular velocity;
-- the exact existing Euler-integration result for one gyroscope step;
-- bit-for-bit repeatability of a fixed reference scenario;
-- angular velocity recovered from a quaternion delta;
-- exact round-trip behavior of the gyroscope-bias accessors.
-
-### Simulation tests
-
-The simulations integrate an independent ground-truth quaternion, synthesize
-ideal vector observations from it, feed those observations to the filter, and
-compare the estimated attitude with the known truth.
-
-The suite covers:
-
-- constant three-axis rotation with ideal gyroscope and direction sensors;
-- convergence from an initial attitude error using two fixed directions;
-- stationary operation with a constant gyroscope bias.
-
-The ground-truth propagation uses `Eigen::AngleAxisd`, while the filter uses
-its original first-order quaternion integration. This separation prevents the
-simulation from merely duplicating the implementation under test.
+The GoogleTest suite checks numerical behavior and runs deterministic sensor
+simulations with motion, noise, timing jitter, and gyroscope bias.
 
 ## Current limitations
 
